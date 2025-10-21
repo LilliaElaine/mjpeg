@@ -28,7 +28,8 @@ type Stream struct {
 }
 
 // NewStream initializes and returns a new Stream.
-func NewStream() *Stream {
+func NewStream(live ...bool) *Stream {
+	headerf += "Content-Length: %d\r\n\r\n"
 	return &Stream{
 		m:             make(map[chan []byte]bool),
 		frame:         make([]byte, len(headerf)),
@@ -39,6 +40,7 @@ func NewStream() *Stream {
 
 // NewStreamWithContext initializes and returns a new Stream.
 func NewStreamWithContext(ctx context.Context) *Stream {
+	headerf += "Content-Length: %d\r\n\r\n"
 	return &Stream{
 		m:             make(map[chan []byte]bool),
 		frame:         make([]byte, len(headerf)),
@@ -47,13 +49,22 @@ func NewStreamWithContext(ctx context.Context) *Stream {
 	}
 }
 
+func NewLiveStream() *Stream {
+	headerf += "\r\n"
+	return &Stream{
+		m:             make(map[chan []byte]bool),
+		frame:         make([]byte, len(headerf)),
+		FrameInterval: 50 * time.Millisecond,
+		ctx:           context.Background(),
+	}
+}
+
 const boundaryWord = "MJPEGBOUNDARY"
-const headerf = "\r\n" +
+
+var headerf = "\r\n" +
 	"--" + boundaryWord + "\r\n" +
 	"Content-Type: image/jpeg\r\n" +
-	"Content-Length: %d\r\n" +
-	"X-Timestamp: %d.%d\r\n" +
-	"\r\n"
+	"X-Timestamp: %d.%d\r\n"
 
 // ServeHTTP responds to HTTP requests with the MJPEG stream, implementing the http.Handler interface.
 func (s *Stream) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -124,5 +135,6 @@ func (s *Stream) updateFrame(jpeg []byte, elapsed time.Duration) {
 func (s *Stream) frameHeader(jpeg []byte, elapsed time.Duration) string {
 	sec := int64(elapsed.Seconds())
 	usec := int64(elapsed.Microseconds() % 1e6)
-	return fmt.Sprintf(headerf, len(jpeg), sec, usec)
+	return fmt.Sprintf(headerf, sec, usec, len(jpeg))
 }
+
